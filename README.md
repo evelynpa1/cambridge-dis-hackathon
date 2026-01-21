@@ -3,7 +3,7 @@
 
 ## Contents
 [Challenge](#challenge)\
-[Repository Structure](repository-structure)\
+[Repository Structure](#repository-structure)\
 [API Keys](#api-keys)
 
 ## Challenge
