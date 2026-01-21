@@ -3,7 +3,7 @@
 
 ## Contents
 [Challenge](#challenge)
-[Repository Structure](repository-strcuture
+[Repository Structure](repository-structure)
 [API Keys](#api-keys)
 
 ## Challenge
@@ -12,7 +12,7 @@
 ### Success Criteria
 <Add details of what a successful solution looks like>
 
-## Repository Strcuture
+## Repository Structure
 <Repo strcture and file details here>
 
 ## Environment Setup
