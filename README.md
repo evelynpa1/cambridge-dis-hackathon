@@ -23,38 +23,80 @@ A factual statement (e.g. from a report, paper, dataset, or trusted source)
 A statement derived from that fact (e.g. a summary, headline, tweet, or claim)
 
 #### Your task is to answer:
-> **Is the external interpretation a faithful representation of the internal fact, or is it a mutation?**
+> **Is the external claim a faithful representation of the internal fact — or a mutation?**
 
 This is harder than it sounds. Mutations can happen in many ways, including but not limited to:
 
-- Missing context or qualifiers  
-- Over-generalization  
-- Changes in tone or implication  
-- Shifts in scope or certainty  
+Most cases are borderline by design.
+People can disagree on whether the meaning has changed.
 
+#### What Counts as a “Mutation”?
+-Shifts in certainty or commitment
+-Numerical rounding or threshold changes
+-Scope or population drift
+-Causality vs correlation confusion
+-Changes in tone, strength, or implication
+-Missing qualifiers or conditions
+
+There is no single ground truth.
+Your agentic jury must reason — not just classify.
 ---
 
 ### ⚖️ Build an AI Jury
 
 You will design a **multi-agent system** - an *AI jury*.
+A valid jury:
+-Has multiple agents with distinct roles
+-Allows agents to analyze, disagree, and refine
 
-Given a *(fact, interpretation)* pair, your jury must:
+and it produces: 
 
-- Reach a verdict  
-- Explain its reasoning  
-- Know when it is uncertain  
+- a verdict  
+- an explanation
+- a signal of uncertainty
+  
+🚫 A single LLM call in a loop is not sufficient.
 
-This is not about being **“right at all costs.”**  It is about reasoning **transparently and responsibly**.
+This is not about being **“right at all costs.”**  It is about reasoning **transparently and responsibly** to reach the verdict. 
 
 ---
+### 🏁 Data Usage
+You do not need to use all the data.
 
+Instead, teams must:
+
+1. Select a specific subset of the dataset
+2. Justify why that subset is interesting or difficult
+3. Apply multi-agent reasoning to it
+   
+Recommended subset size
+- 10-20 claim pairs
+  
+Example valid subsets
+- One domain (e.g. clinical, business, policy)
+- One mutation type (e.g. numerical rounding, modality shift)
+- One high-ambiguity subset (explicitly labeled in the CSV)
+  
+📁 The dataset is pre-categorized by:
+- Domain
+- Mutation type
+- Ambiguity level
+- High-ambiguity subset
+  
+Use these categories strategically.
+
+---
 ### 🏁 Expected Output
 
 By the end of the hackathon, your team should be able to:
 
-- Demo your AI jury 
-- Show how agents reason and (possibly) disagree  
-- Present the final verdict and explanation  
+- Demo a working AI jury built using multiple agents
+- Show how agents reason, including where they agree or disagree
+- Evaluate up to 5 (fact, claim) pairs, producing for each:
+        - a final verdict
+        - a concise, human-readable explanation
+        - Demonstrate that the approach generalizes beyond the presented examples (i.e., it is not hard-coded to specific cases)
+        - Explicitly communicate uncertainty whenever the evidence or agent reasoning is inconclusive
 
 ### Demos can be:
 - CLI output  
@@ -63,16 +105,41 @@ By the end of the hackathon, your team should be able to:
 
 > *Simple is great - clarity matters more than polish.*
 
+##⏱️ The 5-Minute Demo Rule
+
+Your solution should be understandable in 5 minutes or less.
+
+A strong demo typically shows:
+
+1. The chosen data subset
+2. Agent roles and interaction
+3. five concrete claim evaluations
+4. Where agents agree, disagree, or defer
+5. How does your system generalize
+   
+If it can’t be explained in 5 minutes, it’s probably too complex.
 ---
 
 ## 🏆 Judging criteria 
 
 Projects will be judged on:
 
-- Quality of agent design (clear roles, meaningful interaction)  
-- Clarity and honesty of explanations  
-- Handling of uncertainty  
-- Demo clarity and insight  
+#🧠 Agent Design (30%)
+- Clear, purposeful agent roles
+- Meaningful interaction (not just chaining)
+- Evidence of added value vs single-agent baseline
+#🧾 Reasoning & Explanation (30%)
+- Clear, honest explanations
+- Explicit handling of uncertainty
+- Insight into why a case is hard
+#🔍 Data Understanding (20%)
+- Thoughtful subset selection
+- Correct identification of mutation types
+- Awareness of ambiguity
+#🎤 Demo Clarity (20%)
+- Clear structure
+- Easy to follow
+- Teaches the judges something
 
 We care more about **good reasoning** than perfect answers.
 
