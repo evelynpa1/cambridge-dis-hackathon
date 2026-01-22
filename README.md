@@ -9,9 +9,8 @@ This is a fast, hands-on challenge focused on reasoning, disagreement, and trust
 [Challenge](#challenge)\
 [Judging Criteria](#-judging-criteria)\
 [Important Question](#-important-question)\
-[Possible Extension Directions](#-possible-extension-directions)\
-[Repository Structure](#repository-structure)\
-[Environment Setup](#environment-setup)\
+[Possible Extension Direction](#-possible-extension-direction)\
+[Getting Started](#-getting-started)\
 [API Keys](#api-keys)
 
 ## Challenge
@@ -117,14 +116,58 @@ Aim for:
 
 ---
 
-## Repository Structure
-<Repo strcture and file details here>
+## 🚀 Getting Started
 
-## Environment Setup
-<Details on how to setup the environment>
+Ready to build? Here is everything you need to set up your environment, choose your tools, and manage your API usage.
+
+---
+
+### 1. The Repository
+
+Everything you need to begin—including the required datasets, skeleton files, and setup instructions—is in the official hackathon repository.
+
+👉 **Fork the Repository on GitHub**
+
+All teams are expected to build on top of this repository to ensure a consistent baseline for evaluation.
+
+---
+
+### 2. Multi-Agent Frameworks
+
+You are free to use any **Multi-Agent System (MAS)** framework you prefer, such as:
+
+- AutoGen  
+- CrewAI  
+- LangGraph  
+
+If you are new to building agents, we recommend **LangChain**.
+
+**Why?**  
+It makes composing agents quick and intuitive.
+
+📚 **Docs:** [LangChain Documentation](https://docs.langchain.com)
+
+---
 
 ## API Keys
-<Details on API keys here>
+> _(Loubna and James to review — feel free to change this part as necessary)_
+
+To access the LLM services required for your agents, you will use your own API keys. We recommend **OpenAI** for its ease of use and documentation, though you are free to use **Anthropic**, **Gemini**, or others.
+
+💰 **Reimbursement Policy**  
+We will reimburse API costs incurred during the event up to **£[X] per team**.  
+Please save your usage receipts or screenshots for submission at the end of the event.
+
+📉 **Tips to keep costs low:**
+
+- **Use efficient models:**  
+  Start with cheaper models (e.g., `gpt-5-nano` or `gpt-5-mini`) for testing, and only switch to flagship models (e.g., `gpt-5`) for final, distinct tasks.
+- **Limit your Jury:**  
+  When testing, reduce the number of agents in your loop.
+- **Watch the loop:**  
+  Ensure your code has clear *exit conditions* to avoid infinite retry loops that drain credits.
+- **Set hard limits:**  
+  Configure a hard budget limit in your API provider’s dashboard to prevent accidental overspending.
 
 ---
 
