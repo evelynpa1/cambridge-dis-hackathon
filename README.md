@@ -6,12 +6,13 @@ In this hackathon, you’ll design a jury of AI agents that evaluates whether a 
 This is a fast, hands-on challenge focused on reasoning, disagreement, and trust, not infrastructure or large-scale systems.
 
 ## Contents
-[Challenge](#challenge)\
-[Judging Criteria](#-judging-criteria)\
-[Important Question](#-important-question)\
-[Possible Extension Direction](#-possible-extension-direction)\
-[Getting Started](#-getting-started)\
-[API Keys](#api-keys)
+- [Challenge](#challenge)
+- [Judging Criteria](#judging-criteria)
+- [Important Question](#important-question)
+- [Possible Extension Direction](#possible-extension-direction)
+- [Getting Started](#getting-started)
+- [API Keys](#api-keys)
+
 
 ## Challenge
 ### 🚩 The Core Problem
