@@ -147,7 +147,7 @@ We care more about **good reasoning** than perfect answers.
 
 ### A golden solution is:
 - Clearly better than a single-agent baseline  
-- Understandable in a 3-minute demo  
+- Understandable in a 5-minute demo  
 - Teaches you something about multi-agent value  
 - Handles uncertainty responsibly  
 
