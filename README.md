@@ -5,6 +5,7 @@ Welcome to the AI Jury Hackathon!
 In this hackathon, you’ll design a jury of AI agents that evaluates whether a statement faithfully represents a given fact or mutates it.
 This is a fast, hands-on challenge focused on reasoning, disagreement, and trust, not infrastructure or large-scale systems.
 
+
 ## Contents
 - [Challenge](#challenge)
 - [Judging Criteria](#judging-criteria)
@@ -33,22 +34,22 @@ People can disagree on whether the meaning has changed.
 
 ### What Counts as a “Mutation”?
 
-Mutations can be subtle, including:
+Mutations can be **subtle**, including:
 
-- Shifts in certainty or commitment  
-- Numerical rounding or threshold changes  
-- Scope or population drift  
-- Causality vs. correlation confusion  
-- Changes in tone, strength, or implication  
-- Missing qualifiers or conditions  
+- **Shifts in certainty or commitment**  
+- **Numerical rounding or threshold changes**  
+- **Scope or population drift**  
+- **Causality vs. correlation confusion**  
+- **Changes in tone, strength, or implication**  
+- **Missing qualifiers or conditions**
 
-Most cases are borderline by design.  
-Reasonable people often disagree.
+**Please note:**
 
-
-There is no single ground truth.
-Your agentic jury must reason — not just classify.
----
+- **Most cases are borderline by design.**  
+  Reasonable people often disagree.
+- **There is no single ground truth.**
+- **Your agentic jury must reason — not just classify.**
+--
 
 ## ⚖️ Build an AI Jury
 
@@ -97,7 +98,7 @@ Example valid subsets
 Use these categories strategically.
 
 ---
-## 🏁 Expected Output
+### 🏁 Expected Output
 
 By the end of the hackathon, your team must be able to:
 
@@ -119,38 +120,39 @@ By the end of the hackathon, your team must be able to:
 
 > *Simple is great - clarity matters more than polish.*
 
-##⏱️ The 5-Minute Demo Rule
+### The 5-Minute Demo Rule ⏱️
 
 Your solution should be understandable in 5 minutes or less.
 
 A strong demo typically shows:
 
-1. The chosen data subset
-2. Agent roles and interaction
-3. five concrete claim evaluations
-4. Where agents agree, disagree, or defer
-5. How does your system generalize
-   
-If it can’t be explained in 5 minutes, it’s probably too complex.
+1. **The chosen data subset**  
+2. **Agent roles and interactions**  
+3. **Up to five concrete claim evaluations**  
+4. **Where agents agree, disagree, or defer**  
+5. **How the system generalizes beyond the examples**
+
+If it can’t be explained in **5 minutes**, it’s probably too complex.
+
 ---
 
-## 🏆 Judging criteria 
+## Judging Criteria
 
 Projects will be judged on:
 
-### 🧠 Agent Design (30%)
+### Agent Design (30%) 🧠 
 - Clear, purposeful agent roles
 - Meaningful interaction (not just chaining)
 - Evidence of added value vs single-agent baseline
-###🧾 Reasoning & Explanation (30%)
+### Reasoning & Explanation (30%) 🧾
 - Clear, honest explanations
 - Explicit handling of uncertainty
 - Insight into why a case is hard
-###🔍 Data Understanding (20%)
+### Data Understanding (20%) 🔍
 - Thoughtful subset selection
 - Correct identification of mutation types
 - Awareness of ambiguity
-###🎤 Demo Clarity (20%)
+### Demo Clarity (20%) 🎤
 - Clear structure
 - Easy to follow
 - Teaches the judges something
@@ -165,7 +167,7 @@ We care more about **good reasoning** than perfect answers.
 
 ---
 
-## 🧠 Important Question
+## Important Question
 
 During your demo, be prepared to answer:
 
@@ -175,7 +177,7 @@ There is no “correct” answer — **thoughtful reflections are highly valued*
 
 ---
 
-## 🚀 Possible Extension Direction
+## Possible Extension Direction
 
 Beyond defining agent roles, one way to extend your jury’s capabilities is by giving agents access to **tools** — either by creating simple custom tools or by integrating existing ones.
 
@@ -197,7 +199,7 @@ Aim for:
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 Ready to build? Here is everything you need to set up your environment, choose your tools, and manage your API usage.
 
