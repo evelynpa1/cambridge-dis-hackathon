@@ -72,8 +72,14 @@ It must produce:
 This is not about being **“right at all costs.”**  It is about reasoning **transparently and responsibly** to reach the verdict. 
 
 ---
-### 🏁 Data Usage
-You do not need to use all the data.
+### 🏁 Data Access
+
+You do **not** need to use all the data.
+
+All teams must use the **official FactTrace hackathon dataset**, which contains
+high-ambiguity (fact, claim) pairs designed to test subtle semantic mutations.
+
+
 
 Instead, teams must:
 
