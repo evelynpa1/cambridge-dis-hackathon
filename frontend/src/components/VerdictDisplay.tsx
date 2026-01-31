@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { VerdictPayload, AgentMessage } from '@/types/verdict';
 import ReactMarkdown from 'react-markdown';
 
@@ -38,11 +38,6 @@ function DecisionBadge({ decision, confidence }: { decision: string; confidence?
       <span className={`px-4 py-2 rounded-full font-bold text-lg uppercase ${color}`}>
         {decision}
       </span>
-      {confidence !== undefined && (
-        <span className="text-sm text-gray-500">
-          {Math.round(confidence * 100)}% confidence
-        </span>
-      )}
     </div>
   );
 }
@@ -65,6 +60,14 @@ function ConversationMessage({ message }: { message: AgentMessage }) {
 
 export default function VerdictDisplay({ verdict, isStreaming = false }: VerdictDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(true); // Default open for better visibility
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when conversation updates
+  useEffect(() => {
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [verdict.conversation.length, isExpanded]);
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -173,6 +176,7 @@ export default function VerdictDisplay({ verdict, isStreaming = false }: Verdict
                 <span className="text-gray-600">Agent is thinking...</span>
               </div>
             )}
+            <div ref={bottomRef} />
           </div>
         )}
       </div>
