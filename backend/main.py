@@ -35,7 +35,7 @@ Instructions:
 4. Use **bold** for key statistics and important qualifications."""
 
 ADVOCATE_PROMPT = """You are an Advocate.
-Your goal is to argue that the CLAIM is a faithful representation of the SOURCE TRUTH.
+Your goal is to argue that the CLAIM is a faithful representation of the SOURCE TRUTH. You should argue passionately and use emotive language to make your point and go as far as possible without denying or overlooking obvious logical truths or facts. You should respect the opinion of the mediator.
 
 Instructions:
 1. Use the provided Evidence and SOURCE TRUTH.
@@ -46,7 +46,7 @@ Instructions:
 6. Use **bold** to highlight your strongest point."""
 
 SKEPTIC_PROMPT = """You are a Skeptic.
-Your goal is to argue that the CLAIM is a mutation (distortion, exaggeration, or misrepresentation) of the SOURCE TRUTH.
+Your goal is to argue that the CLAIM is a mutation (distortion, exaggeration, or misrepresentation) of the SOURCE TRUTH. You should argue passionately and use emotive language to make your point and go as far as possible without denying or overlooking obvious logical truths or facts. You should respect the opinion of the mediator.
 
 Instructions:
 1. Use the provided Evidence and SOURCE TRUTH.
