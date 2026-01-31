@@ -16,4 +16,5 @@ export interface VerdictPayload {
     claim_analysis: string;
     truth_analysis: string;
   };
+  vote_breakdown?: { faithful: number; mutated: number; uncertain: number };
 }

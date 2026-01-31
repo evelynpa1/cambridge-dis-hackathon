@@ -4,6 +4,7 @@ import csv
 from datetime import datetime
 from typing import Optional
 from contextlib import asynccontextmanager
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,9 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Models
 MODEL_FAST = "gpt-4.1-mini"
 MODEL_JUDGE = "gpt-5.2"
+
+# Majority vote configuration
+NUM_JUDGES = 10
 
 # --------------------------------------------------
 # Agent Prompts
@@ -155,6 +159,7 @@ class VerdictPayload(BaseModel):
     confidence: Optional[float] = None
     disclaimers: Optional[list[str]] = None
     analysis: Optional[AnalysisResult] = None
+    vote_breakdown: Optional[dict[str, int]] = None
 
 class CaseItem(BaseModel):
     id: int
@@ -204,6 +209,70 @@ def get_timestamp() -> str:
     return datetime.now().strftime("%H:%M:%S")
 
 # --------------------------------------------------
+# Majority Vote Judging
+# --------------------------------------------------
+
+def aggregate_verdicts(verdicts: list[dict]) -> dict:
+    """Aggregate multiple judge verdicts into a majority vote decision."""
+    votes = {"faithful": 0, "mutated": 0, "uncertain": 0}
+    summaries_by_decision = {"faithful": [], "mutated": [], "uncertain": []}
+    all_disclaimers = set()
+
+    for v in verdicts:
+        decision = v.get("decision", "uncertain").lower()
+        if decision not in votes:
+            decision = "uncertain"
+        votes[decision] += 1
+        summaries_by_decision[decision].append(v.get("summary", ""))
+        for d in v.get("disclaimers", []):
+            all_disclaimers.add(d)
+
+    # Get majority decision
+    majority_decision = max(votes, key=votes.get)
+    majority_count = votes[majority_decision]
+
+    # Use first summary from majority voters
+    majority_summaries = summaries_by_decision[majority_decision]
+    representative_summary = majority_summaries[0] if majority_summaries else "No summary available"
+
+    return {
+        "decision": majority_decision,
+        "confidence": majority_count / len(verdicts),
+        "summary": representative_summary,
+        "disclaimers": list(all_disclaimers),
+        "vote_breakdown": votes
+    }
+
+
+def run_majority_vote_judgment(claim: str, truth: str, conversation: list, common_context: str) -> dict:
+    """Run 10 judges in parallel and aggregate by majority vote."""
+    judge_prompt = f"""
+    {common_context}
+
+    Full Conversation:
+    {json.dumps([m.model_dump() for m in conversation], indent=2)}
+
+    Return JSON with "decision", "confidence", "summary", "disclaimers".
+    """
+
+    def call_single_judge(judge_id: int) -> dict:
+        print(f"  Judge {judge_id + 1} voting...")
+        result = get_json_response(JUDGE_PROMPT, judge_prompt, MODEL_FAST, temperature=0.95)
+        if not result:
+            return {"decision": "uncertain", "confidence": 0.5, "summary": "Judge failed", "disclaimers": []}
+        return result
+
+    # Run all judges in parallel
+    verdicts = []
+    with ThreadPoolExecutor(max_workers=NUM_JUDGES) as executor:
+        futures = [executor.submit(call_single_judge, i) for i in range(NUM_JUDGES)]
+        for future in as_completed(futures):
+            verdicts.append(future.result())
+
+    return aggregate_verdicts(verdicts)
+
+
+# --------------------------------------------------
 # Multi-Agent Pipeline
 # --------------------------------------------------
 
@@ -213,36 +282,36 @@ def run_jury(claim: str, truth: str, debate_rounds: int = 3) -> VerdictPayload:
 
     # Stage 0.5: Pre-Analysis
     print("Stage 0.5: Pre-Analysis...")
-    
+
     # Analyze Claim
     claim_analysis = call_llm(
         CLAIM_ANALYSIS_PROMPT,
         f"Claim to Analyze:\n{claim}",
         MODEL_FAST
     )
-    
+
     # Analyze Truth
     truth_analysis = call_llm(
         TRUTH_ANALYSIS_PROMPT,
         f"Source Truth to Analyze:\n{truth}",
         MODEL_FAST
     )
-    
+
     # We add Evidence Scout message just to show the Truth has been "gathered" (passed in)
-    conversation.append(AgentMessage(agent="Evidence Scout", message=truth_analysis, timestamp=get_timestamp())) 
+    conversation.append(AgentMessage(agent="Evidence Scout", message=truth_analysis, timestamp=get_timestamp()))
 
     # Stage 2: Debate Loop (Advocate vs Skeptic)
     print("Stage 2: Debate...")
     debate_history = ""
-    
+
     common_context = f"""
     Claim: {claim}
     Source Truth: {truth}
-    
+
     PRE-ANALYSIS:
     [Claim Analysis]:
     {claim_analysis}
-    
+
     [Truth Analysis]:
     {truth_analysis}
     """
@@ -293,25 +362,9 @@ def run_jury(claim: str, truth: str, debate_rounds: int = 3) -> VerdictPayload:
         timestamp=get_timestamp()
     ))
 
-    # Stage 4: Judge makes final decision
-    print("Stage 4: Judge...")
-    judge_prompt = f"""
-    {common_context}
-    
-    Full Conversation:
-    {json.dumps([m.model_dump() for m in conversation], indent=2)}
-
-    Return JSON with "decision", "confidence", "summary", "disclaimers".
-    """
-    judge_result = get_json_response(JUDGE_PROMPT, judge_prompt, MODEL_JUDGE)
-
-    if not judge_result:
-        judge_result = {
-            "decision": "uncertain",
-            "confidence": 0.5,
-            "summary": "The judge failed to produce a valid verdict.",
-            "disclaimers": ["System Error"]
-        }
+    # Stage 4: Jury Vote (10 judges)
+    print("Stage 4: Jury Vote (10 judges)...")
+    judge_result = run_majority_vote_judgment(claim, truth, conversation, common_context)
 
     # Add judge to conversation
     conversation.append(AgentMessage(
@@ -331,7 +384,8 @@ def run_jury(claim: str, truth: str, debate_rounds: int = 3) -> VerdictPayload:
         analysis={
             "claim_analysis": claim_analysis,
             "truth_analysis": truth_analysis
-        }
+        },
+        vote_breakdown=judge_result.get("vote_breakdown")
     )
 
 
@@ -341,14 +395,14 @@ def run_jury_streaming(claim: str, truth: str, debate_rounds: int = 2):
 
     # Stage 0.5: Pre-Analysis
     print("Stage 0.5: Pre-Analysis...")
-    
+
     # Analyze Claim
     claim_analysis = call_llm(
         CLAIM_ANALYSIS_PROMPT,
         f"Claim to Analyze:\n{claim}",
         MODEL_FAST
     )
-    
+
     # Analyze Truth
     truth_analysis = call_llm(
         TRUTH_ANALYSIS_PROMPT,
@@ -368,15 +422,15 @@ def run_jury_streaming(claim: str, truth: str, debate_rounds: int = 2):
     # Stage 2: Debate Loop (Advocate vs Skeptic)
     print("Stage 2: Debate...")
     debate_history = ""
-    
+
     common_context = f"""
     Claim: {claim}
     Source Truth: {truth}
-    
+
     PRE-ANALYSIS:
     [Claim Analysis]:
     {claim_analysis}
-    
+
     [Truth Analysis]:
     {truth_analysis}
     """
@@ -419,25 +473,9 @@ def run_jury_streaming(claim: str, truth: str, debate_rounds: int = 2):
     conversation.append(msg)
     yield {"type": "agent", "data": msg.model_dump()}
 
-    # Stage 4: Judge
-    print("Stage 4: Judge...")
-    judge_prompt = f"""
-    {common_context}
-
-    Full Conversation:
-    {json.dumps([m.model_dump() for m in conversation], indent=2)}
-
-    Return JSON with "decision", "confidence", "summary", "disclaimers".
-    """
-    judge_result = get_json_response(JUDGE_PROMPT, judge_prompt, MODEL_JUDGE)
-
-    if not judge_result:
-        judge_result = {
-            "decision": "uncertain",
-            "confidence": 0.5,
-            "summary": "The judge failed to produce a valid verdict.",
-            "disclaimers": ["System Error"]
-        }
+    # Stage 4: Jury Vote (10 judges)
+    print("Stage 4: Jury Vote (10 judges)...")
+    judge_result = run_majority_vote_judgment(claim, truth, conversation, common_context)
 
     # Add judge to conversation
     msg = AgentMessage(agent="Judge", message=judge_result.get("summary", ""), timestamp=get_timestamp())
@@ -456,7 +494,8 @@ def run_jury_streaming(claim: str, truth: str, debate_rounds: int = 2):
         analysis={
             "claim_analysis": claim_analysis,
             "truth_analysis": truth_analysis
-        }
+        },
+        vote_breakdown=judge_result.get("vote_breakdown")
     )
     yield {"type": "verdict", "data": verdict.model_dump()}
 

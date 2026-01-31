@@ -100,7 +100,23 @@ export default function VerdictDisplay({ verdict, isStreaming = false }: Verdict
             <span className="text-gray-500">Awaiting verdict...</span>
           </div>
         ) : (
-          <DecisionBadge decision={verdict.decision} confidence={verdict.confidence} />
+          <>
+            <DecisionBadge decision={verdict.decision} confidence={verdict.confidence} />
+            {verdict.vote_breakdown && (
+              <div className="mt-4 flex items-center gap-4 text-sm">
+                <span className="text-gray-500">Jury Vote:</span>
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                  {verdict.vote_breakdown.faithful} faithful
+                </span>
+                <span className="px-2 py-1 bg-red-100 text-red-700 rounded">
+                  {verdict.vote_breakdown.mutated} mutated
+                </span>
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
+                  {verdict.vote_breakdown.uncertain} uncertain
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
 
