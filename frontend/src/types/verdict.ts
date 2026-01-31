@@ -12,4 +12,8 @@ export interface VerdictPayload {
   decision: 'faithful' | 'mutated' | 'uncertain';
   confidence?: number;
   disclaimers?: string[];
+  analysis?: {
+    claim_analysis: string;
+    truth_analysis: string;
+  };
 }

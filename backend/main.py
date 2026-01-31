@@ -25,62 +25,108 @@ MODEL_JUDGE = "gpt-5.2"
 # Agent Prompts
 # --------------------------------------------------
 
-EVIDENCE_SCOUT_PROMPT = """You are an Evidence Scout.
-Your goal is to analyze the SOURCE TRUTH and identify key facts that the claim should reflect.
+CLAIM_ANALYSIS_PROMPT = """
+You are a Claim Analyst.
+Your goal is to analyze the claim IN ISOLATION.
+This means that if any information is ambiguous or unnamed, you should point it out.
+For example "the video" or "it is", without actually having named an object, is ambiguous.
 
 Instructions:
-1. Identify key entities, dates, statistics, and qualifications in the SOURCE TRUTH.
-2. Note any hedging language (e.g., "approximately", "may be", "between X and Y").
-3. Be CONCISE. Use max 3-4 bullet points.
-4. Use **bold** for key statistics and important qualifications."""
+1. Identify what is explicitly stated vs. what is implied.
+2. Highlight any specific numbers, dates, or entities.
+3. Note if the claim is missing context (e.g., "The video" - which video?).
+4. Do NOT verify the truth. Just analyze the claim's content and structure.
+5. Be CONCISE (max 3-4 bullet points).
+6. Use **bold** for key terms.
+"""
 
-ADVOCATE_PROMPT = """You are an Advocate.
-Your goal is to argue that the CLAIM is a faithful representation of the SOURCE TRUTH.
+TRUTH_ANALYSIS_PROMPT = """
+You are a Truth Analyst.
+Your goal is to analyze the Reference Statement (Source Truth) IN ISOLATION.
+This means that if any information is ambiguous or unnamed, you should point it out.
+For example "the video" or "it is", without actually having named an object, is ambiguous.
 
 Instructions:
-1. Use the provided Evidence and SOURCE TRUTH.
+1. Identify what is explicitly stated vs. what is implied in the statement.
+2. Highlight any specific numbers, dates, qualifiers (e.g. "over", "approximately"), or entities.
+3. Analyze the statement's structure and scope.
+4. Do NOT verify if it is correct vs external reality. Just analyze the text provided.
+5. Be CONCISE (max 3-4 bullet points).
+6. Use **bold** for key terms.
+"""
+
+ADVOCATE_PROMPT = """
+You are an Advocate.
+Your goal is to argue that the claim is faithful to the truth.
+
+Instructions:
+1. Use the provided Source Truth and the Pre-Analysis.
 2. Read the Debate History to see what the Skeptic has said.
 3. Directly address the Skeptic's points if they have spoken.
-4. Argue why the claim captures the essential meaning of the truth.
+4. Strengthen your case for why the claim is true or faithful.
 5. **CRITICAL**: Limit your response to ONE PARAGRAPH (max 100 words).
-6. Use **bold** to highlight your strongest point."""
+6. Use **bold** to highlight your strongest point or key evidence.
+"""
 
-SKEPTIC_PROMPT = """You are a Skeptic.
-Your goal is to argue that the CLAIM is a mutation (distortion, exaggeration, or misrepresentation) of the SOURCE TRUTH.
+SKEPTIC_PROMPT = """
+You are a Skeptic.
+Your goal is to argue that the claim is misleading, mutated, or false.
 
 Instructions:
-1. Use the provided Evidence and SOURCE TRUTH.
+1. Use the provided Source Truth and the Pre-Analysis.
 2. Read the Debate History to see what the Advocate has said.
 3. Directly address the Advocate's points if they have spoken.
-4. Point out: missing context, changed numbers, removed qualifications, causal confusion, or exaggerations.
+4. Point out logical leaps, missing context, or specific contradictions.
 5. **CRITICAL**: Limit your response to ONE PARAGRAPH (max 100 words).
-6. Use **bold** to highlight the biggest discrepancy."""
+6. Use **bold** to highlight the biggest flaw or contradiction.
+"""
 
-FACT_CHECKER_PROMPT = """You are a Fact-Checker.
-Your goal is to provide a neutral, objective comparison of the CLAIM vs SOURCE TRUTH.
+MEDIATOR_PROMPT = """
+You are a Mediator.
+Your goal is to keep the debate focused and constructive.
 
 Instructions:
-1. Review the Evidence and Debate History.
-2. List specific differences between claim and truth (numbers, qualifiers, framing).
-3. Provide a SHORT verdict (max 3-4 sentences).
-4. Use **bold** for your assessment keyword (**Accurate**, **Misleading**, **Exaggerated**, etc.)."""
+1. Review the Advocate and Skeptic arguments.
+2. If they are getting stuck on minor semantics (e.g. "which video?"), intervene.
+3. Suggest a reasonable assumption to move forward (e.g. "Let's assume we are discussing the primary video").
+4. If the debate is healthy, just provide a neutral 1-sentence synthesis.
+5. **CRITICAL**: Max 1-2 sentences. Fact-check their logic if needed.
+"""
 
-JUDGE_PROMPT = """You are a Judge.
+FACT_CHECKER_PROMPT = """
+You are a Fact-Checker.
+Your goal is to provide a neutral, objective verification of the claim based on the truth and debate.
 
-Compare the CLAIM against the SOURCE TRUTH and the debate to reach a verdict.
+Instructions:
+1. Review the Source Truth and the Debate History.
+2. Assess whether the claim matches the specific facts in the truth text.
+3. Provide a SHORT summary verification (max 3-4 sentences).
+4. Use **bold** for your final verdict keyword (e.g. **Supported**, **Misleading**, **Unproven**).
+"""
+
+JUDGE_PROMPT = """
+You are a Judge.
+
+Use the conversation, the Pre-Analysis, and the Source Truth to reach a verdict.
 
 Decide whether the claim is:
-- FAITHFUL: The claim accurately represents the source truth
-- MUTATED: The claim distorts, exaggerates, omits key context, or misrepresents the source
-- UNCERTAIN: The evidence is ambiguous or the claim is partially accurate
+- FAITHFUL (The claim accurately represents the truth/facts. Minor simplifications are okay if the essence is preserved.)
+- MUTATED (The claim distorts, exaggerates, omits key qualifiers, or misrepresents the facts.)
+- UNCERTAIN (Only use this if there is NO relevant evidence or the truth is genuinely ambiguous.)
+
+**CRITICAL INSTRUCTION**:
+You MUST choose between FAITHFUL or MUTATED if possible. Avoid UNCERTAIN unless absolutely necessary.
+If the claim changes "over 3.7 billion" to "3.7 billion", ask yourself: Does this materially mislead?
+If the claim implies a false context, it is MUTATED.
 
 Output VALID JSON (no markdown) with this structure:
 {
   "decision": "faithful" | "mutated" | "uncertain",
   "confidence": 0.0 to 1.0,
-  "summary": "3-5 sentences explaining the verdict, referencing specific discrepancies or accuracies",
+  "summary": "5-7 sentences explaining the verdict...",
   "disclaimers": ["list", "of", "important", "caveats"]
-}"""
+}
+"""
 
 # --------------------------------------------------
 # Pydantic Models
@@ -89,21 +135,26 @@ Output VALID JSON (no markdown) with this structure:
 class VerifyRequest(BaseModel):
     claim: str
     truth: str
-    debate_rounds: int = 2  # Reduced for speed
+    debate_rounds: int = 2
 
 class AgentMessage(BaseModel):
     agent: str
     message: str
     timestamp: Optional[str] = None
 
+class AnalysisResult(BaseModel):
+    claim_analysis: str
+    truth_analysis: str
+
 class VerdictPayload(BaseModel):
     claim: str
     truth: str
     conversation: list[AgentMessage]
     summary: str
-    decision: str  # 'faithful' | 'mutated' | 'uncertain'
+    decision: str
     confidence: Optional[float] = None
     disclaimers: Optional[list[str]] = None
+    analysis: Optional[AnalysisResult] = None
 
 class CaseItem(BaseModel):
     id: int
@@ -156,32 +207,51 @@ def get_timestamp() -> str:
 # Multi-Agent Pipeline
 # --------------------------------------------------
 
-def run_jury(claim: str, truth: str, debate_rounds: int = 2) -> VerdictPayload:
+def run_jury(claim: str, truth: str, debate_rounds: int = 3) -> VerdictPayload:
     """Run the multi-agent jury to evaluate if a claim is faithful to the truth."""
     conversation = []
 
-    # Stage 1: Evidence Scout analyzes the source truth
-    print("Stage 1: Evidence Scout...")
-    evidence = call_llm(
-        EVIDENCE_SCOUT_PROMPT,
-        f"SOURCE TRUTH:\n{truth}\n\nCLAIM being evaluated:\n{claim}",
+    # Stage 0.5: Pre-Analysis
+    print("Stage 0.5: Pre-Analysis...")
+    
+    # Analyze Claim
+    claim_analysis = call_llm(
+        CLAIM_ANALYSIS_PROMPT,
+        f"Claim to Analyze:\n{claim}",
         MODEL_FAST
     )
-    conversation.append(AgentMessage(
-        agent="Evidence Scout",
-        message=evidence,
-        timestamp=get_timestamp()
-    ))
+    
+    # Analyze Truth
+    truth_analysis = call_llm(
+        TRUTH_ANALYSIS_PROMPT,
+        f"Source Truth to Analyze:\n{truth}",
+        MODEL_FAST
+    )
+    
+    # We add Evidence Scout message just to show the Truth has been "gathered" (passed in)
+    conversation.append(AgentMessage(agent="Evidence Scout", message=truth_analysis, timestamp=get_timestamp())) 
 
     # Stage 2: Debate Loop (Advocate vs Skeptic)
     print("Stage 2: Debate...")
     debate_history = ""
+    
+    common_context = f"""
+    Claim: {claim}
+    Source Truth: {truth}
+    
+    PRE-ANALYSIS:
+    [Claim Analysis]:
+    {claim_analysis}
+    
+    [Truth Analysis]:
+    {truth_analysis}
+    """
 
     for round_num in range(debate_rounds):
         print(f"  Round {round_num + 1}")
 
         # Advocate argues claim is faithful
-        adv_prompt = f"""CLAIM:\n{claim}\n\nSOURCE TRUTH:\n{truth}\n\nEvidence:\n{evidence}\n\nDebate History:\n{debate_history}"""
+        adv_prompt = f"{common_context}\n\nDebate History:\n{debate_history}"
         advocate_arg = call_llm(ADVOCATE_PROMPT, adv_prompt, MODEL_FAST)
         conversation.append(AgentMessage(
             agent="Advocate",
@@ -191,7 +261,7 @@ def run_jury(claim: str, truth: str, debate_rounds: int = 2) -> VerdictPayload:
         debate_history += f"\n[Advocate]: {advocate_arg}\n"
 
         # Skeptic argues claim is mutated
-        skp_prompt = f"""CLAIM:\n{claim}\n\nSOURCE TRUTH:\n{truth}\n\nEvidence:\n{evidence}\n\nDebate History:\n{debate_history}"""
+        skp_prompt = f"{common_context}\n\nDebate History:\n{debate_history}"
         skeptic_arg = call_llm(SKEPTIC_PROMPT, skp_prompt, MODEL_FAST)
         conversation.append(AgentMessage(
             agent="Skeptic",
@@ -200,11 +270,21 @@ def run_jury(claim: str, truth: str, debate_rounds: int = 2) -> VerdictPayload:
         ))
         debate_history += f"\n[Skeptic]: {skeptic_arg}\n"
 
+        # Mediator Interjects
+        med_prompt = f"{common_context}\n\nDebate History:\n{debate_history}"
+        mediator_arg = call_llm(MEDIATOR_PROMPT, med_prompt, MODEL_FAST)
+        conversation.append(AgentMessage(
+            agent="Mediator",
+            message=mediator_arg,
+            timestamp=get_timestamp()
+        ))
+        debate_history += f"\n[Mediator]: {mediator_arg}\n"
+
     # Stage 3: Fact-Checker provides neutral analysis
     print("Stage 3: Fact-Checker...")
     fact_check = call_llm(
         FACT_CHECKER_PROMPT,
-        f"CLAIM:\n{claim}\n\nSOURCE TRUTH:\n{truth}\n\nEvidence:\n{evidence}\n\nDebate History:\n{debate_history}",
+        f"{common_context}\n\nDebate History:\n{debate_history}",
         MODEL_FAST
     )
     conversation.append(AgentMessage(
@@ -216,17 +296,13 @@ def run_jury(claim: str, truth: str, debate_rounds: int = 2) -> VerdictPayload:
     # Stage 4: Judge makes final decision
     print("Stage 4: Judge...")
     judge_prompt = f"""
-CLAIM:
-{claim}
+    {common_context}
+    
+    Full Conversation:
+    {json.dumps([m.model_dump() for m in conversation], indent=2)}
 
-SOURCE TRUTH:
-{truth}
-
-Full Conversation:
-{json.dumps([m.model_dump() for m in conversation], indent=2)}
-
-Return JSON with "decision", "confidence", "summary", "disclaimers".
-"""
+    Return JSON with "decision", "confidence", "summary", "disclaimers".
+    """
     judge_result = get_json_response(JUDGE_PROMPT, judge_prompt, MODEL_JUDGE)
 
     if not judge_result:
@@ -251,7 +327,11 @@ Return JSON with "decision", "confidence", "summary", "disclaimers".
         summary=judge_result.get("summary", ""),
         decision=judge_result.get("decision", "uncertain").lower(),
         confidence=judge_result.get("confidence", 0.5),
-        disclaimers=judge_result.get("disclaimers", [])
+        disclaimers=judge_result.get("disclaimers", []),
+        analysis={
+            "claim_analysis": claim_analysis,
+            "truth_analysis": truth_analysis
+        }
     )
 
 
@@ -259,65 +339,96 @@ def run_jury_streaming(claim: str, truth: str, debate_rounds: int = 2):
     """Generator that yields each agent message as it's generated for SSE streaming."""
     conversation = []
 
-    # Stage 1: Evidence Scout analyzes the source truth
-    print("Stage 1: Evidence Scout...")
-    evidence = call_llm(
-        EVIDENCE_SCOUT_PROMPT,
-        f"SOURCE TRUTH:\n{truth}\n\nCLAIM being evaluated:\n{claim}",
+    # Stage 0.5: Pre-Analysis
+    print("Stage 0.5: Pre-Analysis...")
+    
+    # Analyze Claim
+    claim_analysis = call_llm(
+        CLAIM_ANALYSIS_PROMPT,
+        f"Claim to Analyze:\n{claim}",
         MODEL_FAST
     )
-    msg = AgentMessage(agent="Evidence Scout", message=evidence, timestamp=get_timestamp())
+    
+    # Analyze Truth
+    truth_analysis = call_llm(
+        TRUTH_ANALYSIS_PROMPT,
+        f"Source Truth to Analyze:\n{truth}",
+        MODEL_FAST
+    )
+
+    # Yield unique analysis event
+    analysis_data = AnalysisResult(claim_analysis=claim_analysis, truth_analysis=truth_analysis)
+    yield {"type": "analysis", "data": analysis_data.model_dump()}
+
+    # Yield truth analysis as an evidence scout message to show progress
+    msg = AgentMessage(agent="Evidence Scout", message=truth_analysis, timestamp=get_timestamp())
     conversation.append(msg)
     yield {"type": "agent", "data": msg.model_dump()}
 
     # Stage 2: Debate Loop (Advocate vs Skeptic)
     print("Stage 2: Debate...")
     debate_history = ""
+    
+    common_context = f"""
+    Claim: {claim}
+    Source Truth: {truth}
+    
+    PRE-ANALYSIS:
+    [Claim Analysis]:
+    {claim_analysis}
+    
+    [Truth Analysis]:
+    {truth_analysis}
+    """
 
     for round_num in range(debate_rounds):
         print(f"  Round {round_num + 1}")
 
-        # Advocate argues claim is faithful
-        adv_prompt = f"""CLAIM:\n{claim}\n\nSOURCE TRUTH:\n{truth}\n\nEvidence:\n{evidence}\n\nDebate History:\n{debate_history}"""
+        # Advocate
+        adv_prompt = f"{common_context}\n\nDebate History:\n{debate_history}"
         advocate_arg = call_llm(ADVOCATE_PROMPT, adv_prompt, MODEL_FAST)
         msg = AgentMessage(agent="Advocate", message=advocate_arg, timestamp=get_timestamp())
         conversation.append(msg)
         yield {"type": "agent", "data": msg.model_dump()}
         debate_history += f"\n[Advocate]: {advocate_arg}\n"
 
-        # Skeptic argues claim is mutated
-        skp_prompt = f"""CLAIM:\n{claim}\n\nSOURCE TRUTH:\n{truth}\n\nEvidence:\n{evidence}\n\nDebate History:\n{debate_history}"""
+        # Skeptic
+        skp_prompt = f"{common_context}\n\nDebate History:\n{debate_history}"
         skeptic_arg = call_llm(SKEPTIC_PROMPT, skp_prompt, MODEL_FAST)
         msg = AgentMessage(agent="Skeptic", message=skeptic_arg, timestamp=get_timestamp())
         conversation.append(msg)
         yield {"type": "agent", "data": msg.model_dump()}
         debate_history += f"\n[Skeptic]: {skeptic_arg}\n"
 
-    # Stage 3: Fact-Checker provides neutral analysis
+        # Mediator
+        med_prompt = f"{common_context}\n\nDebate History:\n{debate_history}"
+        mediator_arg = call_llm(MEDIATOR_PROMPT, med_prompt, MODEL_FAST)
+        msg = AgentMessage(agent="Mediator", message=mediator_arg, timestamp=get_timestamp())
+        conversation.append(msg)
+        yield {"type": "agent", "data": msg.model_dump()}
+        debate_history += f"\n[Mediator]: {mediator_arg}\n"
+
+    # Stage 3: Fact-Checker
     print("Stage 3: Fact-Checker...")
     fact_check = call_llm(
         FACT_CHECKER_PROMPT,
-        f"CLAIM:\n{claim}\n\nSOURCE TRUTH:\n{truth}\n\nEvidence:\n{evidence}\n\nDebate History:\n{debate_history}",
+        f"{common_context}\n\nDebate History:\n{debate_history}",
         MODEL_FAST
     )
     msg = AgentMessage(agent="Fact-Checker", message=fact_check, timestamp=get_timestamp())
     conversation.append(msg)
     yield {"type": "agent", "data": msg.model_dump()}
 
-    # Stage 4: Judge makes final decision
+    # Stage 4: Judge
     print("Stage 4: Judge...")
     judge_prompt = f"""
-CLAIM:
-{claim}
+    {common_context}
 
-SOURCE TRUTH:
-{truth}
+    Full Conversation:
+    {json.dumps([m.model_dump() for m in conversation], indent=2)}
 
-Full Conversation:
-{json.dumps([m.model_dump() for m in conversation], indent=2)}
-
-Return JSON with "decision", "confidence", "summary", "disclaimers".
-"""
+    Return JSON with "decision", "confidence", "summary", "disclaimers".
+    """
     judge_result = get_json_response(JUDGE_PROMPT, judge_prompt, MODEL_JUDGE)
 
     if not judge_result:
@@ -341,7 +452,11 @@ Return JSON with "decision", "confidence", "summary", "disclaimers".
         summary=judge_result.get("summary", ""),
         decision=judge_result.get("decision", "uncertain").lower(),
         confidence=judge_result.get("confidence", 0.5),
-        disclaimers=judge_result.get("disclaimers", [])
+        disclaimers=judge_result.get("disclaimers", []),
+        analysis={
+            "claim_analysis": claim_analysis,
+            "truth_analysis": truth_analysis
+        }
     )
     yield {"type": "verdict", "data": verdict.model_dump()}
 

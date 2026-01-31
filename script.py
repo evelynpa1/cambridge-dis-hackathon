@@ -98,12 +98,38 @@ Instructions:
 6. Provide a "Context/Nuance" section if the claim misses important details.
 """
 
+CLAIM_ANALYSIS_PROMPT = """
+You are a Claim Analyst.
+Your goal is to analyze the claim IN ISOLATION.
+
+Instructions:
+1. Identify what is explicitly stated vs. what is implied.
+2. Highlight any specific numbers, dates, or entities.
+3. Note if the claim is missing context (e.g., "The video" - which video?).
+4. Do NOT verify the truth. Just analyze the claim's content and structure.
+5. Be CONCISE (max 3-4 bullet points).
+6. Use **bold** for key terms.
+"""
+
+TRUTH_ANALYSIS_PROMPT = """
+You are a Truth Analyst.
+Your goal is to analyze the Source Truth IN ISOLATION.
+
+Instructions:
+1. Identify the key facts available in the evidence/truth text.
+2. Highlight any qualifiers (e.g., "over", "approximately", "at least").
+3. Note specific dates, numbers, and entities.
+4. Do NOT compare it to the claim yet. Just extract the core truth.
+5. Be CONCISE (max 3-4 bullet points).
+6. Use **bold** for key terms.
+"""
+
 ADVOCATE_PROMPT = """
 You are an Advocate.
 Your goal is to argue that the claim is faithful to the truth.
 
 Instructions:
-1. Use the provided Evidence.
+1. Use the provided Evidence and the Pre-Analysis (Claim vs Truth).
 2. Read the Debate History to see what the Skeptic has said.
 3. Directly address the Skeptic's points if they have spoken.
 4. Strengthen your case for why the claim is true or faithful.
@@ -117,7 +143,7 @@ You are a Skeptic.
 Your goal is to argue that the claim is misleading, mutated, or false.
 
 Instructions:
-1. Use the provided Evidence.
+1. Use the provided Evidence and the Pre-Analysis (Claim vs Truth).
 2. Read the Debate History to see what the Advocate has said.
 3. Directly address the Advocate's points if they have spoken.
 4. Point out logical leaps, missing context, or specific contradictions in the claim.
@@ -147,13 +173,17 @@ changes how the claim should be interpreted.
 JUDGE_PROMPT = """
 You are a Judge.
 
-Use the conversation AND the trust weights to reach a verdict.
-Higher-weight agents should influence you more.
+Use the conversation, the Pre-Analysis, and the evidence to reach a verdict.
 
 Decide whether the claim is:
-- FAITHFUL (The claim accurately represents the truth/facts)
-- MUTATED (The claim distorts, exaggerates, or misrepresents the facts)
-- UNCERTAIN (There is not enough evidence to be sure, or the claim is partially true but misleading)
+- FAITHFUL (The claim accurately represents the truth/facts. Minor simplifications are okay if the essence is preserved.)
+- MUTATED (The claim distorts, exaggerates, omits key qualifiers, or misrepresents the facts.)
+- UNCERTAIN (Only use this if there is NO relevant evidence or the truth is genuinely ambiguous.)
+
+**CRITICAL INSTRUCTION**:
+You MUST choose between FAITHFUL or MUTATED if possible. Avoid UNCERTAIN unless absolutely necessary.
+If the claim changes "over 3.7 billion" to "3.7 billion", ask yourself: Does this materially mislead?
+If the claim implies a false context, it is MUTATED.
 
 Output VALID JSON (no markdown) with this structure:
 {
@@ -226,23 +256,48 @@ def verify_claim(claim: str) -> dict:
     def get_time():
         return datetime.datetime.now().strftime("%H:%M:%S")
 
-    # Meta controller isn't really a debater, but we can log it if we want. 
-    # Or just keep it internal. The frontend sample shows Fact-Checker, Skeptic, Advocate, Judge.
     # Let's exclude Meta from the visible conversation or add it as "System".
     # conversation.append({"agent": "Meta Controller", "message": f"Assigned weights: {json.dumps(w)}", "timestamp": get_time()})
 
     # ---- Stage 1: Evidence Scout
     print("Stage 1: Evidence Scout...")
-    evidence = call_llm(
-        EVIDENCE_SCOUT_PROMPT,
-        f"Claim:\n{claim}",
-        MODEL_FAST,
-        temperature=0.2,
+    evidence = call_llm(EVIDENCE_SCOUT_PROMPT, f"Claim: {claim}\nGather evidence to verify this.", MODEL_FAST)
+    # Use the evidence as the "Truth/Facts" for this debate
+    truth_text = evidence 
+    
+    # ---- New Stage: Pre-Analysis ----
+    print("Stage 0.5: Pre-Analysis...")
+    
+    claim_analysis = call_llm(
+        CLAIM_ANALYSIS_PROMPT,
+        f"Claim to Analyze:\n{claim}",
+        MODEL_FAST
     )
-    conversation.append({"agent": "Evidence Scout", "message": evidence, "timestamp": get_time()})
+    
+    truth_analysis = call_llm(
+        TRUTH_ANALYSIS_PROMPT,
+        f"Source Truth to Analyze:\n{truth_text}",
+        MODEL_FAST
+    )
 
-    # ---- Stage 2: Debate Loop (Advocate & Skeptic)
-    print("Stage 2: Debate Loop...")
+    # ---- Stage 2: Debate Loop ----
+    conversation = []
+    conversation.append({"agent": "Evidence Scout", "message": evidence, "timestamp": datetime.datetime.now().strftime("%H:%M:%S")})
+    
+    # Updated context includes the Analysis
+    common_context = f"""
+    Claim: {claim}
+    Evidence/Truth: {truth_text}
+    
+    PRE-ANALYSIS (Use this to guide your arguments):
+    [Claim Analysis]:
+    {claim_analysis}
+    
+    [Truth Analysis]:
+    {truth_analysis}
+    
+    Debate History:
+    """
     debate_rounds = 4
     debate_history = ""
     
@@ -251,14 +306,14 @@ def verify_claim(claim: str) -> dict:
         print(f"  - {round_name}")
         
         # Advocate Turn
-        adv_prompt = f"Claim:\n{claim}\n\nEvidence:\n{evidence}\n\nDebate History so far:\n{debate_history}"
+        adv_prompt = f"{common_context}\n{debate_history}"
         advocate_arg = call_llm(ADVOCATE_PROMPT, adv_prompt, MODEL_FAST)
         
         conversation.append({"agent": "Advocate", "message": advocate_arg, "timestamp": get_time()})
         debate_history += f"\n[Advocate]: {advocate_arg}\n"
 
         # Skeptic Turn
-        skp_prompt = f"Claim:\n{claim}\n\nEvidence:\n{evidence}\n\nDebate History so far:\n{debate_history}"
+        skp_prompt = f"{common_context}\n{debate_history}"
         skeptic_arg = call_llm(SKEPTIC_PROMPT, skp_prompt, MODEL_FAST)
         
         conversation.append({"agent": "Skeptic", "message": skeptic_arg, "timestamp": get_time()})
@@ -290,6 +345,12 @@ def verify_claim(claim: str) -> dict:
 
         Trust Weights:
         {json.dumps(w, indent=2)}
+
+        Pre-Analysis:
+        [Claim Analysis]:
+        {claim_analysis}
+        [Truth Analysis]:
+        {truth_analysis}
 
         Full Conversation:
         {json.dumps(conversation, indent=2)}
@@ -326,13 +387,16 @@ def verify_claim(claim: str) -> dict:
     return {
         "claim": claim,
         "truth": evidence, # Using evidence as the "Truth/Facts" context
+        "analysis": {
+            "claim_analysis": claim_analysis,
+            "truth_analysis": truth_analysis
+        },
         "conversation": conversation,
         "summary": judge.get("summary", ""),
         "decision": judge.get("decision", "uncertain").lower(),
-        "confidence": judge.get("confidence", 0.5)
+        "confidence": judge.get("confidence", 0.5),
+        "disclaimers": judge.get("disclaimers", [])
     }
-
-
 # --------------------------------------------------
 # Example
 # --------------------------------------------------

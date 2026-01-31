@@ -134,6 +134,15 @@ export default function Home() {
                     conversation: [...prev.conversation, event.data],
                   };
                 });
+              } else if (event.type === 'analysis') {
+                // Update analysis section immediately
+                setVerdict((prev) => {
+                  if (!prev) return null; // Should ideally be initialized
+                  return {
+                    ...prev,
+                    analysis: event.data,
+                  };
+                });
               } else if (event.type === 'verdict') {
                 // Final verdict with all data
                 setVerdict(event.data);

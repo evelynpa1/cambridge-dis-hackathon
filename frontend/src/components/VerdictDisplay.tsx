@@ -118,6 +118,31 @@ export default function VerdictDisplay({ verdict, isStreaming = false }: Verdict
         )}
       </div>
 
+      {/* Deep Analysis Card - Side by Side */}
+      {verdict.analysis && (
+        <div className="bg-white rounded-xl shadow-lg border-l-4 border-indigo-500 overflow-hidden">
+          <div className="p-6 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-indigo-600 uppercase tracking-wide">
+              Agent Pre-Analysis
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+            <div className="p-6 bg-gray-50/50">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Claim Breakdown</h3>
+              <div className="prose prose-sm max-w-none text-gray-700">
+                <ReactMarkdown>{verdict.analysis.claim_analysis}</ReactMarkdown>
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50/50">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Truth Extraction</h3>
+              <div className="prose prose-sm max-w-none text-gray-700">
+                <ReactMarkdown>{verdict.analysis.truth_analysis}</ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Disclaimers Card - Conditional */}
       {verdict.disclaimers && verdict.disclaimers.length > 0 && (
         <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-400">
