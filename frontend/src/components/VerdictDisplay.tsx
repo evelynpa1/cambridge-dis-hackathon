@@ -2,21 +2,25 @@
 
 import { useState } from 'react';
 import { VerdictPayload, AgentMessage } from '@/types/verdict';
+import ReactMarkdown from 'react-markdown';
 
 interface VerdictDisplayProps {
   verdict: VerdictPayload;
 }
 
 const agentColors: Record<string, string> = {
-  'Sceptic': 'bg-red-100 border-red-300 text-red-800',
-  'Fact-Checker': 'bg-blue-100 border-blue-300 text-blue-800',
-  'Judge': 'bg-purple-100 border-purple-300 text-purple-800',
-  'Advocate': 'bg-green-100 border-green-300 text-green-800',
-  'Moderator': 'bg-gray-100 border-gray-300 text-gray-800',
+  'Sceptic': 'bg-red-50 border-red-200 text-gray-900',  // Softer background for readibility
+  'Skeptic': 'bg-red-50 border-red-200 text-gray-900', // Handle spelling variant
+  'Fact-Checker': 'bg-blue-50 border-blue-200 text-gray-900',
+  'Judge': 'bg-purple-50 border-purple-200 text-gray-900',
+  'Advocate': 'bg-green-50 border-green-200 text-gray-900',
+  'Moderator': 'bg-gray-50 border-gray-200 text-gray-900',
+  'Evidence Scout': 'bg-yellow-50 border-yellow-200 text-gray-900',
+  'Context Analyst': 'bg-indigo-50 border-indigo-200 text-gray-900',
 };
 
 function getAgentColor(agent: string): string {
-  return agentColors[agent] || 'bg-slate-100 border-slate-300 text-slate-800';
+  return agentColors[agent] || 'bg-slate-50 border-slate-200 text-gray-900';
 }
 
 function DecisionBadge({ decision, confidence }: { decision: string; confidence?: number }) {
@@ -46,18 +50,20 @@ function ConversationMessage({ message }: { message: AgentMessage }) {
   return (
     <div className={`p-4 rounded-lg border-l-4 ${getAgentColor(message.agent)}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="font-semibold">{message.agent}</span>
+        <span className="font-semibold text-sm uppercase tracking-wider opacity-80">{message.agent}</span>
         {message.timestamp && (
-          <span className="text-xs opacity-60">{message.timestamp}</span>
+          <span className="text-xs opacity-60 font-mono">{message.timestamp}</span>
         )}
       </div>
-      <p className="whitespace-pre-wrap">{message.message}</p>
+      <div className="prose prose-sm max-w-none text-gray-800">
+        <ReactMarkdown>{message.message}</ReactMarkdown>
+      </div>
     </div>
   );
 }
 
 export default function VerdictDisplay({ verdict }: VerdictDisplayProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true); // Default open for better visibility
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -66,15 +72,17 @@ export default function VerdictDisplay({ verdict }: VerdictDisplayProps) {
         <h2 className="text-sm font-semibold text-blue-600 uppercase tracking-wide mb-2">
           External Claim
         </h2>
-        <p className="text-xl text-gray-800">{verdict.claim}</p>
+        <p className="text-xl text-gray-900 font-medium">{verdict.claim}</p>
       </div>
 
       {/* Truth Card - Always Visible */}
       <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-emerald-500">
         <h2 className="text-sm font-semibold text-emerald-600 uppercase tracking-wide mb-2">
-          Source Truth
+          Source Truth / Evidence Context
         </h2>
-        <p className="text-xl text-gray-800">{verdict.truth}</p>
+        <div className="prose prose-sm max-w-none text-gray-800">
+          <ReactMarkdown>{verdict.truth}</ReactMarkdown>
+        </div>
       </div>
 
       {/* Decision Card - Always Visible */}
@@ -90,8 +98,24 @@ export default function VerdictDisplay({ verdict }: VerdictDisplayProps) {
         <h2 className="text-sm font-semibold text-amber-600 uppercase tracking-wide mb-2">
           Summary
         </h2>
-        <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{verdict.summary}</p>
+        <div className="prose max-w-none text-gray-800">
+          <ReactMarkdown>{verdict.summary}</ReactMarkdown>
+        </div>
       </div>
+
+      {/* Disclaimers Card - Conditional */}
+      {verdict.disclaimers && verdict.disclaimers.length > 0 && (
+        <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-400">
+          <h2 className="text-sm font-semibold text-orange-600 uppercase tracking-wide mb-2">
+            Disclaimers & Caveats
+          </h2>
+          <ul className="list-disc list-inside space-y-1 text-gray-700">
+            {verdict.disclaimers.map((item, i) => (
+              <li key={i}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Collapsible Agent Discussion */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
