@@ -76,20 +76,73 @@ export default function Home() {
 
     setVerifying(true);
     setError(null);
+    // Reset verdict but keep claim/truth for partial display
+    setVerdict({
+      claim,
+      truth,
+      conversation: [],
+      summary: '',
+      decision: 'uncertain',
+      confidence: 0,
+      disclaimers: [],
+    });
 
     try {
-      const res = await fetch(`${API_URL}/api/verify`, {
+      const res = await fetch(`${API_URL}/api/verify/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ claim, truth, debate_rounds: 2 }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setVerdict(data);
-      } else {
+      if (!res.ok) {
         const err = await res.json();
         setError(err.detail || 'Verification failed');
+        setVerifying(false);
+        return;
+      }
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        setError('Failed to read stream');
+        setVerifying(false);
+        return;
+      }
+
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+
+              if (event.type === 'agent') {
+                // Add new agent message to conversation
+                setVerdict((prev) => {
+                  if (!prev) return prev;
+                  return {
+                    ...prev,
+                    conversation: [...prev.conversation, event.data],
+                  };
+                });
+              } else if (event.type === 'verdict') {
+                // Final verdict with all data
+                setVerdict(event.data);
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e);
+            }
+          }
+        }
       }
     } catch (err) {
       setError('Failed to connect to backend. Is it running on port 8000?');
@@ -191,8 +244,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* Verdict Display */}
-        {verdict && !loading && <VerdictDisplay verdict={verdict} />}
+        {/* Verdict Display - show during streaming too */}
+        {verdict && verdict.conversation.length > 0 && !loading && (
+          <VerdictDisplay verdict={verdict} isStreaming={verifying} />
+        )}
       </div>
     </main>
   );

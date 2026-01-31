@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 
 interface VerdictDisplayProps {
   verdict: VerdictPayload;
+  isStreaming?: boolean;
 }
 
 const agentColors: Record<string, string> = {
@@ -62,7 +63,7 @@ function ConversationMessage({ message }: { message: AgentMessage }) {
   );
 }
 
-export default function VerdictDisplay({ verdict }: VerdictDisplayProps) {
+export default function VerdictDisplay({ verdict, isStreaming = false }: VerdictDisplayProps) {
   const [isExpanded, setIsExpanded] = useState(true); // Default open for better visibility
 
   return (
@@ -85,22 +86,36 @@ export default function VerdictDisplay({ verdict }: VerdictDisplayProps) {
         </div>
       </div>
 
-      {/* Decision Card - Always Visible */}
+      {/* Decision Card - Show placeholder while streaming */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
           Final Decision
         </h2>
-        <DecisionBadge decision={verdict.decision} confidence={verdict.confidence} />
+        {isStreaming ? (
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-purple-500"></div>
+            <span className="text-gray-500">Awaiting verdict...</span>
+          </div>
+        ) : (
+          <DecisionBadge decision={verdict.decision} confidence={verdict.confidence} />
+        )}
       </div>
 
-      {/* Summary Card - Always Visible */}
+      {/* Summary Card - Show placeholder while streaming */}
       <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-amber-500">
         <h2 className="text-sm font-semibold text-amber-600 uppercase tracking-wide mb-2">
           Summary
         </h2>
-        <div className="prose max-w-none text-gray-800">
-          <ReactMarkdown>{verdict.summary}</ReactMarkdown>
-        </div>
+        {isStreaming && !verdict.summary ? (
+          <div className="flex items-center gap-2 text-gray-500">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-500"></div>
+            <span>Generating summary...</span>
+          </div>
+        ) : (
+          <div className="prose max-w-none text-gray-800">
+            <ReactMarkdown>{verdict.summary}</ReactMarkdown>
+          </div>
+        )}
       </div>
 
       {/* Disclaimers Card - Conditional */}
@@ -130,6 +145,12 @@ export default function VerdictDisplay({ verdict }: VerdictDisplayProps) {
             <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full">
               {verdict.conversation.length} messages
             </span>
+            {isStreaming && (
+              <span className="flex items-center gap-1.5 text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                LIVE
+              </span>
+            )}
           </div>
           <svg
             className={`w-6 h-6 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
@@ -146,6 +167,12 @@ export default function VerdictDisplay({ verdict }: VerdictDisplayProps) {
             {verdict.conversation.map((msg, index) => (
               <ConversationMessage key={index} message={msg} />
             ))}
+            {isStreaming && (
+              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200 animate-pulse">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                <span className="text-gray-600">Agent is thinking...</span>
+              </div>
+            )}
           </div>
         )}
       </div>

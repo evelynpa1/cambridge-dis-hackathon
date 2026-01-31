@@ -254,6 +254,97 @@ Return JSON with "decision", "confidence", "summary", "disclaimers".
         disclaimers=judge_result.get("disclaimers", [])
     )
 
+
+def run_jury_streaming(claim: str, truth: str, debate_rounds: int = 2):
+    """Generator that yields each agent message as it's generated for SSE streaming."""
+    conversation = []
+
+    # Stage 1: Evidence Scout analyzes the source truth
+    print("Stage 1: Evidence Scout...")
+    evidence = call_llm(
+        EVIDENCE_SCOUT_PROMPT,
+        f"SOURCE TRUTH:\n{truth}\n\nCLAIM being evaluated:\n{claim}",
+        MODEL_FAST
+    )
+    msg = AgentMessage(agent="Evidence Scout", message=evidence, timestamp=get_timestamp())
+    conversation.append(msg)
+    yield {"type": "agent", "data": msg.model_dump()}
+
+    # Stage 2: Debate Loop (Advocate vs Skeptic)
+    print("Stage 2: Debate...")
+    debate_history = ""
+
+    for round_num in range(debate_rounds):
+        print(f"  Round {round_num + 1}")
+
+        # Advocate argues claim is faithful
+        adv_prompt = f"""CLAIM:\n{claim}\n\nSOURCE TRUTH:\n{truth}\n\nEvidence:\n{evidence}\n\nDebate History:\n{debate_history}"""
+        advocate_arg = call_llm(ADVOCATE_PROMPT, adv_prompt, MODEL_FAST)
+        msg = AgentMessage(agent="Advocate", message=advocate_arg, timestamp=get_timestamp())
+        conversation.append(msg)
+        yield {"type": "agent", "data": msg.model_dump()}
+        debate_history += f"\n[Advocate]: {advocate_arg}\n"
+
+        # Skeptic argues claim is mutated
+        skp_prompt = f"""CLAIM:\n{claim}\n\nSOURCE TRUTH:\n{truth}\n\nEvidence:\n{evidence}\n\nDebate History:\n{debate_history}"""
+        skeptic_arg = call_llm(SKEPTIC_PROMPT, skp_prompt, MODEL_FAST)
+        msg = AgentMessage(agent="Skeptic", message=skeptic_arg, timestamp=get_timestamp())
+        conversation.append(msg)
+        yield {"type": "agent", "data": msg.model_dump()}
+        debate_history += f"\n[Skeptic]: {skeptic_arg}\n"
+
+    # Stage 3: Fact-Checker provides neutral analysis
+    print("Stage 3: Fact-Checker...")
+    fact_check = call_llm(
+        FACT_CHECKER_PROMPT,
+        f"CLAIM:\n{claim}\n\nSOURCE TRUTH:\n{truth}\n\nEvidence:\n{evidence}\n\nDebate History:\n{debate_history}",
+        MODEL_FAST
+    )
+    msg = AgentMessage(agent="Fact-Checker", message=fact_check, timestamp=get_timestamp())
+    conversation.append(msg)
+    yield {"type": "agent", "data": msg.model_dump()}
+
+    # Stage 4: Judge makes final decision
+    print("Stage 4: Judge...")
+    judge_prompt = f"""
+CLAIM:
+{claim}
+
+SOURCE TRUTH:
+{truth}
+
+Full Conversation:
+{json.dumps([m.model_dump() for m in conversation], indent=2)}
+
+Return JSON with "decision", "confidence", "summary", "disclaimers".
+"""
+    judge_result = get_json_response(JUDGE_PROMPT, judge_prompt, MODEL_JUDGE)
+
+    if not judge_result:
+        judge_result = {
+            "decision": "uncertain",
+            "confidence": 0.5,
+            "summary": "The judge failed to produce a valid verdict.",
+            "disclaimers": ["System Error"]
+        }
+
+    # Add judge to conversation
+    msg = AgentMessage(agent="Judge", message=judge_result.get("summary", ""), timestamp=get_timestamp())
+    conversation.append(msg)
+    yield {"type": "agent", "data": msg.model_dump()}
+
+    # Yield final verdict
+    verdict = VerdictPayload(
+        claim=claim,
+        truth=truth,
+        conversation=conversation,
+        summary=judge_result.get("summary", ""),
+        decision=judge_result.get("decision", "uncertain").lower(),
+        confidence=judge_result.get("confidence", 0.5),
+        disclaimers=judge_result.get("disclaimers", [])
+    )
+    yield {"type": "verdict", "data": verdict.model_dump()}
+
 # --------------------------------------------------
 # Load Cases from CSV
 # --------------------------------------------------
@@ -345,6 +436,35 @@ def verify_claim(request: VerifyRequest):
         json.dump(result.model_dump(), f, indent=2)
 
     return result
+
+
+@app.post("/api/verify/stream")
+def verify_claim_stream(request: VerifyRequest):
+    """Run the multi-agent jury with SSE streaming for real-time updates"""
+    def event_generator():
+        global latest_verdict
+        for event in run_jury_streaming(
+            claim=request.claim,
+            truth=request.truth,
+            debate_rounds=request.debate_rounds
+        ):
+            if event["type"] == "verdict":
+                latest_verdict = VerdictPayload(**event["data"])
+                # Save to result.json
+                result_path = os.path.join(os.path.dirname(__file__), "..", "result.json")
+                with open(result_path, 'w') as f:
+                    json.dump(event["data"], f, indent=2)
+
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 @app.get("/api/verdict", response_model=VerdictPayload)
 def get_verdict():
